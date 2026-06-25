@@ -81,11 +81,11 @@ func (*VMInstance) Read(ctx context.Context, req infer.ReadRequest[VMInstanceArg
 	c := newClient(ctx)
 	vm, err := c.GetVM(ctx, req.ID)
 	if err != nil {
-		return infer.ReadResponse[VMInstanceArgs, VMInstanceState]{
-			ID:     req.ID,
-			Inputs: req.Inputs,
-			State:  req.State,
-		}, fmt.Errorf("reading VM %s: %w", req.ID, err)
+		// Return zero value on error: the SDK discards the response when error is
+		// non-nil, so returning req.State here is harmless but non-idiomatic.
+		// The README example (pulumi-go-provider v1.3.2 infer/README.md) shows
+		// returning an empty ReadResponse on error.
+		return infer.ReadResponse[VMInstanceArgs, VMInstanceState]{}, fmt.Errorf("reading VM %s: %w", req.ID, err)
 	}
 	state := req.State
 	state.VMID = vm.ID
