@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"time"
 )
 
@@ -23,23 +24,55 @@ func (e *APIError) Error() string {
 	return fmt.Sprintf("OneProvider API error %d: %s", e.StatusCode, e.Body)
 }
 
-// VM represents a OneProvider virtual machine.
-// TODO: verify all field names against the actual API response.
+// VM is the flattened representation returned by client methods.
 type VM struct {
-	ID       string `json:"id"`       // TODO: verify field name
-	IP       string `json:"ip"`       // TODO: verify field name (may be "main_ip" or "ipv4")
-	Status   string `json:"status"`   // TODO: verify field name
-	Hostname string `json:"hostname"` // TODO: verify field name
+	ID       string
+	IP       string
+	State    string
+	Hostname string
+}
+
+// vmCreateResponse is the wire format for POST /vm/create.
+type vmCreateResponse struct {
+	Result   string          `json:"result"`
+	Response vmCreateDetail  `json:"response"`
+}
+
+type vmCreateDetail struct {
+	ID        int    `json:"id"`
+	IPAddress string `json:"ip_address"`
+	Hostname  string `json:"hostname"`
+}
+
+// vmInfoResponse is the wire format for GET /vm/info/{id}.
+type vmInfoResponse struct {
+	Result   string       `json:"result"`
+	Response vmInfoDetail `json:"response"`
+}
+
+type vmInfoDetail struct {
+	IsInstalling int           `json:"is_installing"`
+	ServerInfo   vmServerInfo  `json:"server_info"`
+	ServerState  vmServerState `json:"server_state"`
+}
+
+type vmServerInfo struct {
+	ID        string `json:"id"`
+	IPAddress string `json:"ipaddress"`
+	Hostname  string `json:"hostname"`
+}
+
+type vmServerState struct {
+	State string `json:"state"`
 }
 
 // CreateVMRequest is the body sent to the create endpoint.
-// TODO: verify all field names against the actual API docs.
 type CreateVMRequest struct {
-	Hostname  string   `json:"hostname"`  // TODO: verify
-	Region    string   `json:"location"`  // TODO: verify ("location", "region", "datacenter"?)
-	Plan      string   `json:"plan"`      // TODO: verify
-	OsID      string   `json:"os_id"`     // TODO: verify ("os_id", "image", "template"?)
-	SSHKeyIDs []string `json:"ssh_keys"`  // TODO: verify ("ssh_keys", "sshkeys", "ssh_key_ids"?)
+	Hostname     string   `json:"hostname"`
+	LocationID   int      `json:"location_id"`
+	InstanceSize int      `json:"instance_size"`
+	Template     string   `json:"template"`
+	SSHKeyIDs    []string `json:"ssh_keys"`
 }
 
 // Client calls the OneProvider API.
@@ -82,9 +115,8 @@ func (c *Client) do(ctx context.Context, method, path string, body any) (*http.R
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
-	// TODO: verify the exact header names for both credentials
-	req.Header.Set("X-API-Key", c.apiKey)       // TODO: verify header name
-	req.Header.Set("X-Client-Key", c.clientKey) // TODO: verify header name
+	req.Header.Set("Api-Key", c.apiKey)
+	req.Header.Set("Client-Key", c.clientKey)
 
 	resp, err := c.http.Do(req)
 	if err != nil {
@@ -98,40 +130,52 @@ func (c *Client) do(ctx context.Context, method, path string, body any) (*http.R
 	return resp, nil
 }
 
-// CreateVM creates a new VM and returns it in whatever initial state the API returns.
+// CreateVM creates a new VM and returns its initial state.
 func (c *Client) CreateVM(ctx context.Context, req CreateVMRequest) (*VM, error) {
-	// TODO: verify endpoint path (e.g. "/VM", "/VM/create")
-	resp, err := c.do(ctx, http.MethodPost, "/VM", req)
+	resp, err := c.do(ctx, http.MethodPost, "/vm/create", req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	var vm VM
-	if err := json.NewDecoder(resp.Body).Decode(&vm); err != nil {
+	var wire vmCreateResponse
+	if err := json.NewDecoder(resp.Body).Decode(&wire); err != nil {
 		return nil, fmt.Errorf("decoding create response: %w", err)
 	}
-	return &vm, nil
+	return &VM{
+		ID:       strconv.Itoa(wire.Response.ID),
+		IP:       wire.Response.IPAddress,
+		Hostname: wire.Response.Hostname,
+	}, nil
 }
 
 // GetVM returns the current state of a VM by ID.
 func (c *Client) GetVM(ctx context.Context, vmID string) (*VM, error) {
-	// TODO: verify endpoint path (e.g. "/VM/{id}", "/VM?id={id}")
-	resp, err := c.do(ctx, http.MethodGet, "/VM/"+vmID, nil)
+	resp, err := c.do(ctx, http.MethodGet, "/vm/info/"+vmID, nil)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	var vm VM
-	if err := json.NewDecoder(resp.Body).Decode(&vm); err != nil {
+	var wire vmInfoResponse
+	if err := json.NewDecoder(resp.Body).Decode(&wire); err != nil {
 		return nil, fmt.Errorf("decoding get response: %w", err)
 	}
-	return &vm, nil
+	return &VM{
+		ID:       wire.Response.ServerInfo.ID,
+		IP:       wire.Response.ServerInfo.IPAddress,
+		State:    wire.Response.ServerState.State,
+		Hostname: wire.Response.ServerInfo.Hostname,
+	}, nil
 }
 
-// DeleteVM destroys a VM by ID.
+// DeleteVM destroys a VM. confirm_close is always true because Pulumi destroy
+// is an explicit user action — we accept any bandwidth overage charges.
 func (c *Client) DeleteVM(ctx context.Context, vmID string) error {
-	// TODO: verify endpoint path and method (may be POST /VM/{id}/destroy)
-	resp, err := c.do(ctx, http.MethodDelete, "/VM/"+vmID, nil)
+	id, err := strconv.Atoi(vmID)
+	if err != nil {
+		return fmt.Errorf("invalid VM ID %q: %w", vmID, err)
+	}
+	body := map[string]any{"vm_id": id, "confirm_close": true}
+	resp, err := c.do(ctx, http.MethodPost, "/vm/destroy", body)
 	if err != nil {
 		return err
 	}
@@ -141,9 +185,12 @@ func (c *Client) DeleteVM(ctx context.Context, vmID string) error {
 
 // UpdateHostname renames a VM in-place.
 func (c *Client) UpdateHostname(ctx context.Context, vmID, hostname string) error {
-	// TODO: verify endpoint path and request body field name
-	body := map[string]string{"hostname": hostname}
-	resp, err := c.do(ctx, http.MethodPut, "/VM/"+vmID+"/hostname", body)
+	id, err := strconv.Atoi(vmID)
+	if err != nil {
+		return fmt.Errorf("invalid VM ID %q: %w", vmID, err)
+	}
+	body := map[string]any{"vm_id": id, "hostname": hostname}
+	resp, err := c.do(ctx, http.MethodPost, "/vm/hostname", body)
 	if err != nil {
 		return err
 	}
@@ -151,24 +198,23 @@ func (c *Client) UpdateHostname(ctx context.Context, vmID, hostname string) erro
 	return nil
 }
 
-// WaitForActive polls GetVM every 5 seconds until the VM status is "active"
+// WaitForActive polls GetVM every 5 seconds until server_state.state is "online"
 // or the context deadline is exceeded (caller should set a 10-minute timeout).
+// While the VM is installing, the response omits server_state entirely — those
+// ticks are treated as still-pending and do not error.
 func (c *Client) WaitForActive(ctx context.Context, vmID string) (*VM, error) {
-	// TODO: replace "active" with the actual status string from the API
-	const activeStatus = "active"
-
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-ctx.Done():
-			return nil, fmt.Errorf("VM %s did not become active: %w", vmID, ctx.Err())
+			return nil, fmt.Errorf("VM %s did not become online: %w", vmID, ctx.Err())
 		case <-ticker.C:
 			vm, err := c.GetVM(ctx, vmID)
 			if err != nil {
 				return nil, fmt.Errorf("polling VM %s: %w", vmID, err)
 			}
-			if vm.Status == activeStatus {
+			if vm.State == "online" {
 				return vm, nil
 			}
 		}

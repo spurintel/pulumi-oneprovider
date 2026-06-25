@@ -16,37 +16,42 @@ func TestCreateVM(t *testing.T) {
 		if r.Method != http.MethodPost {
 			t.Errorf("expected POST, got %s", r.Method)
 		}
-		// TODO: verify path matches actual create endpoint e.g. "/VM"
-		if r.URL.Path != "/VM" {
+		if r.URL.Path != "/vm/create" {
 			t.Errorf("unexpected path %s", r.URL.Path)
 		}
-		// TODO: verify header names match actual API
-		if r.Header.Get("X-API-Key") == "" {
-			t.Error("missing X-API-Key header")
+		if r.Header.Get("Api-Key") == "" {
+			t.Error("missing Api-Key header")
+		}
+		if r.Header.Get("Client-Key") == "" {
+			t.Error("missing Client-Key header")
 		}
 		w.Header().Set("Content-Type", "application/json")
-		// TODO: replace field names with actual API response shape
 		json.NewEncoder(w).Encode(map[string]any{
-			"id":     "vm-123",
-			"status": "pending",
-			"ip":     "1.2.3.4",
+			"result": "success",
+			"response": map[string]any{
+				"message":    "Virtual server created",
+				"id":         123456,
+				"ip_address": "1.2.3.4",
+				"hostname":   "test-host",
+				"password":   "fAk3Passw0Rd",
+			},
 		})
 	}))
 	defer srv.Close()
 
 	c := client.NewWithBaseURL("test-api-key", "test-client-key", srv.URL)
 	vm, err := c.CreateVM(context.Background(), client.CreateVMRequest{
-		Hostname:  "test-host",
-		Region:    "ash",
-		Plan:      "SSD-1",
-		OsID:      "ubuntu-22",
-		SSHKeyIDs: []string{"key-1"},
+		Hostname:     "test-host",
+		LocationID:   1,
+		InstanceSize: 2,
+		Template:     "linux-ubuntu-22.04-x86_64",
+		SSHKeyIDs:    []string{"key-uuid-1"},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if vm.ID != "vm-123" {
-		t.Errorf("expected ID vm-123, got %q", vm.ID)
+	if vm.ID != "123456" {
+		t.Errorf("expected ID 123456, got %q", vm.ID)
 	}
 }
 
@@ -55,28 +60,39 @@ func TestGetVM(t *testing.T) {
 		if r.Method != http.MethodGet {
 			t.Errorf("expected GET, got %s", r.Method)
 		}
-		if r.URL.Path != "/VM/vm-123" {
+		if r.URL.Path != "/vm/info/123456" {
 			t.Errorf("unexpected path %s", r.URL.Path)
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{
-			"id":     "vm-123",
-			"status": "active", // TODO: verify actual active status string
-			"ip":     "1.2.3.4",
+			"result": "success",
+			"response": map[string]any{
+				"server_info": map[string]any{
+					"id":        "123456",
+					"ipaddress": "1.2.3.4",
+					"hostname":  "test-host.example.com",
+				},
+				"server_state": map[string]any{
+					"state": "online",
+				},
+			},
 		})
 	}))
 	defer srv.Close()
 
 	c := client.NewWithBaseURL("test-api-key", "test-client-key", srv.URL)
-	vm, err := c.GetVM(context.Background(), "vm-123")
+	vm, err := c.GetVM(context.Background(), "123456")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if vm.Status != "active" { // TODO: match actual status string
-		t.Errorf("expected status active, got %q", vm.Status)
+	if vm.State != "online" {
+		t.Errorf("expected state online, got %q", vm.State)
 	}
 	if vm.IP != "1.2.3.4" {
 		t.Errorf("expected IP 1.2.3.4, got %q", vm.IP)
+	}
+	if vm.ID != "123456" {
+		t.Errorf("expected ID 123456, got %q", vm.ID)
 	}
 }
 
@@ -84,19 +100,32 @@ func TestDeleteVM(t *testing.T) {
 	called := false
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
-		// TODO: verify method and path match actual delete endpoint
-		if r.Method != http.MethodDelete {
-			t.Errorf("expected DELETE, got %s", r.Method)
+		if r.Method != http.MethodPost {
+			t.Errorf("expected POST, got %s", r.Method)
 		}
-		if r.URL.Path != "/VM/vm-123" {
+		if r.URL.Path != "/vm/destroy" {
 			t.Errorf("unexpected path %s", r.URL.Path)
 		}
-		w.WriteHeader(http.StatusNoContent)
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Errorf("decoding body: %v", err)
+		}
+		if body["vm_id"] != float64(123456) {
+			t.Errorf("expected vm_id 123456, got %v", body["vm_id"])
+		}
+		if body["confirm_close"] != true {
+			t.Errorf("expected confirm_close true, got %v", body["confirm_close"])
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"result":   "success",
+			"response": map[string]any{"message": "Virtual server destroyed"},
+		})
 	}))
 	defer srv.Close()
 
 	c := client.NewWithBaseURL("test-api-key", "test-client-key", srv.URL)
-	if err := c.DeleteVM(context.Background(), "vm-123"); err != nil {
+	if err := c.DeleteVM(context.Background(), "123456"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !called {

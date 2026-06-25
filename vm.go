@@ -13,11 +13,11 @@ import (
 
 // VMInstanceArgs are the inputs declared in Pulumi config.
 type VMInstanceArgs struct {
-	Region    string   `pulumi:"region"`
-	Plan      string   `pulumi:"plan"`
-	OsID      string   `pulumi:"osId"`
-	Hostname  string   `pulumi:"hostname"`
-	SSHKeyIDs []string `pulumi:"sshKeyIds"`
+	LocationID   int      `pulumi:"locationId"`
+	InstanceSize int      `pulumi:"instanceSize"`
+	Template     string   `pulumi:"template"`
+	Hostname     string   `pulumi:"hostname"`
+	SSHKeyIDs    []string `pulumi:"sshKeyIds"`
 }
 
 // VMInstanceState is the full persisted state (inputs + API-computed outputs).
@@ -47,11 +47,11 @@ func (*VMInstance) Create(ctx context.Context, req infer.CreateRequest[VMInstanc
 
 	c := newClient(ctx)
 	vm, err := c.CreateVM(ctx, client.CreateVMRequest{
-		Hostname:  req.Inputs.Hostname,
-		Region:    req.Inputs.Region,
-		Plan:      req.Inputs.Plan,
-		OsID:      req.Inputs.OsID,
-		SSHKeyIDs: req.Inputs.SSHKeyIDs,
+		Hostname:     req.Inputs.Hostname,
+		LocationID:   req.Inputs.LocationID,
+		InstanceSize: req.Inputs.InstanceSize,
+		Template:     req.Inputs.Template,
+		SSHKeyIDs:    req.Inputs.SSHKeyIDs,
 	})
 	if err != nil {
 		return infer.CreateResponse[VMInstanceState]{}, fmt.Errorf("creating VM %s: %w", req.Name, err)
@@ -126,14 +126,14 @@ func (*VMInstance) Update(ctx context.Context, req infer.UpdateRequest[VMInstanc
 func (*VMInstance) Diff(_ context.Context, req infer.DiffRequest[VMInstanceArgs, VMInstanceState]) (p.DiffResponse, error) {
 	diff := map[string]p.PropertyDiff{}
 
-	if req.State.Region != req.Inputs.Region {
-		diff["region"] = p.PropertyDiff{Kind: p.UpdateReplace}
+	if req.State.LocationID != req.Inputs.LocationID {
+		diff["locationId"] = p.PropertyDiff{Kind: p.UpdateReplace}
 	}
-	if req.State.Plan != req.Inputs.Plan {
-		diff["plan"] = p.PropertyDiff{Kind: p.UpdateReplace}
+	if req.State.InstanceSize != req.Inputs.InstanceSize {
+		diff["instanceSize"] = p.PropertyDiff{Kind: p.UpdateReplace}
 	}
-	if req.State.OsID != req.Inputs.OsID {
-		diff["osId"] = p.PropertyDiff{Kind: p.UpdateReplace}
+	if req.State.Template != req.Inputs.Template {
+		diff["template"] = p.PropertyDiff{Kind: p.UpdateReplace}
 	}
 	if !stringSlicesEqual(req.State.SSHKeyIDs, req.Inputs.SSHKeyIDs) {
 		diff["sshKeyIds"] = p.PropertyDiff{Kind: p.UpdateReplace}
