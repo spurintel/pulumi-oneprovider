@@ -2,7 +2,10 @@ module github.com/spurintel/pulumi-oneprovider
 
 go 1.25.8
 
-require github.com/pulumi/pulumi-go-provider v1.3.2
+require (
+	github.com/pulumi/pulumi-go-provider v1.3.2
+	github.com/pulumi/pulumi/sdk/v3 v3.242.0
+)
 
 require (
 	dario.cat/mergo v1.0.0 // indirect
@@ -33,7 +36,7 @@ require (
 	github.com/erikgeiser/coninput v0.0.0-20211004153227-1c3628e74d0f // indirect
 	github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376 // indirect
 	github.com/go-git/go-billy/v5 v5.9.0 // indirect
-	github.com/go-git/go-git/v5 v5.19.0 // indirect
+	github.com/go-git/go-git/v5 v5.19.1 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
@@ -75,7 +78,6 @@ require (
 	github.com/pulumi/appdash v0.0.0-20231130102222-75f619a67231 // indirect
 	github.com/pulumi/esc v0.24.0 // indirect
 	github.com/pulumi/pulumi/pkg/v3 v3.242.0 // indirect
-	github.com/pulumi/pulumi/sdk/v3 v3.242.0 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
 	github.com/sabhiram/go-gitignore v0.0.0-20210923224102-525f6e181f06 // indirect
