@@ -9,11 +9,11 @@ import (
 
 // VMInstanceArgs are the inputs for a OneProvider VMInstance resource.
 type VMInstanceArgs struct {
-	Region    pulumi.StringInput      `pulumi:"region"`
-	Plan      pulumi.StringInput      `pulumi:"plan"`
-	OsID      pulumi.StringInput      `pulumi:"osId"`
-	Hostname  pulumi.StringInput      `pulumi:"hostname"`
-	SSHKeyIDs pulumi.StringArrayInput `pulumi:"sshKeyIds"`
+	LocationID   pulumi.IntInput         `pulumi:"locationId"`
+	InstanceSize pulumi.IntInput         `pulumi:"instanceSize"`
+	Template     pulumi.StringInput      `pulumi:"template"`
+	Hostname     pulumi.StringInput      `pulumi:"hostname"`
+	SSHKeyIDs    pulumi.StringArrayInput `pulumi:"sshKeyIds"`
 }
 
 // ElementType returns the element type of the VMInstanceArgs.
@@ -25,13 +25,13 @@ func (VMInstanceArgs) ElementType() reflect.Type {
 type VMInstance struct {
 	pulumi.CustomResourceState
 
-	Region    pulumi.StringOutput      `pulumi:"region"`
-	Plan      pulumi.StringOutput      `pulumi:"plan"`
-	OsID      pulumi.StringOutput      `pulumi:"osId"`
-	Hostname  pulumi.StringOutput      `pulumi:"hostname"`
-	SSHKeyIDs pulumi.StringArrayOutput `pulumi:"sshKeyIds"`
-	VMID      pulumi.StringOutput      `pulumi:"vmId"`
-	IP        pulumi.StringOutput      `pulumi:"ip"`
+	LocationID   pulumi.IntOutput         `pulumi:"locationId"`
+	InstanceSize pulumi.IntOutput         `pulumi:"instanceSize"`
+	Template     pulumi.StringOutput      `pulumi:"template"`
+	Hostname     pulumi.StringOutput      `pulumi:"hostname"`
+	SSHKeyIDs    pulumi.StringArrayOutput `pulumi:"sshKeyIds"`
+	VMID         pulumi.StringOutput      `pulumi:"vmId"`
+	IP           pulumi.StringOutput      `pulumi:"ip"`
 }
 
 // NewVMInstance creates or looks up a VMInstance resource.
