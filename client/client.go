@@ -162,7 +162,7 @@ func (c *Client) WaitForActive(ctx context.Context, vmID string) (*VM, error) {
 	for {
 		select {
 		case <-ctx.Done():
-			return nil, fmt.Errorf("timed out waiting for VM %s to become active: %w", vmID, ctx.Err())
+			return nil, fmt.Errorf("VM %s did not become active: %w", vmID, ctx.Err())
 		case <-ticker.C:
 			vm, err := c.GetVM(ctx, vmID)
 			if err != nil {

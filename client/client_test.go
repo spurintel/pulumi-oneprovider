@@ -55,7 +55,9 @@ func TestGetVM(t *testing.T) {
 		if r.Method != http.MethodGet {
 			t.Errorf("expected GET, got %s", r.Method)
 		}
-		// TODO: verify path pattern matches actual API e.g. "/VM/vm-123"
+		if r.URL.Path != "/VM/vm-123" {
+			t.Errorf("unexpected path %s", r.URL.Path)
+		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{
 			"id":     "vm-123",
@@ -85,6 +87,9 @@ func TestDeleteVM(t *testing.T) {
 		// TODO: verify method and path match actual delete endpoint
 		if r.Method != http.MethodDelete {
 			t.Errorf("expected DELETE, got %s", r.Method)
+		}
+		if r.URL.Path != "/VM/vm-123" {
+			t.Errorf("unexpected path %s", r.URL.Path)
 		}
 		w.WriteHeader(http.StatusNoContent)
 	}))
